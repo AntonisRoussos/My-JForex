@@ -1,0 +1,4 @@
+My-JForex
+=========
+
+JForex strategies
