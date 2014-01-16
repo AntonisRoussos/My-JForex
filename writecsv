@@ -1,0 +1,115 @@
+package jforex;
+ 
+import java.util.*;
+import java.io.*;
+import java.text.*;
+ 
+import com.dukascopy.api.*;
+
+@RequiresFullAccess
+public class ExportToCSV implements IStrategy {
+   private IEngine engine;
+   private IConsole console;
+   private IHistory history;
+   private IContext context;
+   private IIndicators indicators;
+   private IUserInterface userInterface;
+     
+    @Configurable("Instrument")
+    public Instrument instrument = Instrument.EURUSD;
+ 
+    @Configurable("Period")
+    public Period period = Period.ONE_MIN;
+     
+    @Configurable("OfferSide")
+    public OfferSide offerSide = OfferSide.BID;
+
+    @Configurable("DaysBack")
+    public int daysBack = 4;
+ 
+    @Configurable("File")
+    public File file;
+     
+    private Writer out;
+    private DateFormat dateFormat;
+    private DecimalFormat priceFormat;
+ 
+   public void onStart(IContext context) throws JFException {
+      this.engine = context.getEngine();
+      this.console = context.getConsole();
+      this.history = context.getHistory();
+      this.context = context;
+      this.indicators = context.getIndicators();
+      this.userInterface = context.getUserInterface();
+         
+        dateFormat = new SimpleDateFormat("yyyy.MM.dd,HH:mm");
+        dateFormat.setTimeZone(TimeZone.getTimeZone("GMT"));
+         
+        priceFormat = new DecimalFormat("0.#####");
+ 
+        if (file == null || file.getPath().equals("")) {
+            console.getErr().println("File not selected");
+            context.stop();
+            return;
+        }
+        try {
+            out = new BufferedWriter(new FileWriter(file));
+        } catch (Exception e) {
+            console.getErr().println(e.getMessage());
+            e.printStackTrace(console.getErr());
+            context.stop();
+        }
+    }
+ 
+   public void onAccount(IAccount account) throws JFException {
+   }
+ 
+   public void onMessage(IMessage message) throws JFException {
+   }
+ 
+   public void onStop() throws JFException {
+        if (out != null) {
+            try {
+                out.close();
+            } catch (Exception e) {
+                console.getErr().println(e.getMessage());
+                e.printStackTrace(console.getErr());
+                context.stop();
+            }
+        }
+   }
+ 
+   public void onTick(Instrument instrument, ITick tick) throws JFException {
+   }
+   
+   public void onBar(Instrument instrument, Period period, IBar askBar, IBar bidBar) throws JFException {
+        if (instrument != this.instrument || period != this.period) {
+            return;
+        }
+        private IBar previousBar[];
+        IBar bar = offerSide == OfferSide.ASK ? askBar : bidBar;
+        try {
+            out.write(dateFormat.format(bar.getTime()) + "," + priceFormat.format(bar.getOpen()) + "," + priceFormat.format(bar.getHigh()) + ","
+                    + priceFormat.format(bar.getLow()) + "," + priceFormat.format(bar.getClose()) + "," + priceFormat.format(askBar.getVolume()));
+        } catch (Exception e) {
+            console.getErr().println(e.getMessage());
+            e.printStackTrace(console.getErr());
+            context.stop();
+        }
+
+	for(int i = 1; i = daysBack; i++) {
+	        previousBar[i] = history.getBar(myInstrument, myPeriod, myOfferSide, i+1);
+	        try {
+	            out.write("," + priceFormat.format(previousBar[i].getOpen()) + "," + priceFormat.format(bar.getHigh()) + ","
+	                    + priceFormat.format(bar.getLow()) + "," + priceFormat.format(bar.getClose()) + "," + priceFormat.format(askBar.getVolume()));
+	        } catch (Exception e) {
+	            console.getErr().println(e.getMessage());
+	            e.printStackTrace(console.getErr());
+	            context.stop();
+	        }
+	}
+
+        out.write("\r\n");
+
+   }
+}
