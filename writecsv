@@ -27,6 +27,21 @@ public class ExportToCSV implements IStrategy {
     @Configurable("DaysBack")
     public int daysBack = 4;
  
+    @Configurable("EMA time period")
+    public int emaTimePeriod = 5;
+ 
+    @Configurable("MACD Fast time period")
+    public int macdFastTimePeriod = 12;
+
+    @Configurable("MACD Slow time period")
+    public int macdSlowTimePeriod = 26;
+
+    @Configurable("MACD Signal time period")
+    public int macdSignalTimePeriod = 9;
+
+    @Configurable("RSI time period")
+    public int rsiTimePeriod = 14;
+
     @Configurable("File")
     public File file;
      
@@ -34,7 +49,7 @@ public class ExportToCSV implements IStrategy {
     private DateFormat dateFormat;
     private DecimalFormat priceFormat;
  
-   public void onStart(IContext context) throws JFException {
+    public void onStart(IContext context) throws JFException {
       this.engine = context.getEngine();
       this.console = context.getConsole();
       this.history = context.getHistory();
@@ -87,29 +102,53 @@ public class ExportToCSV implements IStrategy {
             return;
         }
         private IBar previousBar[];
+	int candlesBefore = daysBack, candlesAfter = 0;
         IBar bar = offerSide == OfferSide.ASK ? askBar : bidBar;
+        previousBar[0] = bar;
+    	long currBarTime = barar.getTime();
+	double ema[] = indicators.ema(instrument, period, offerSide, IIndicators.AppliedPrice.CLOSE,
+        	emaTimePeriod, Filter.NO_FILTER, candlesBefore, currBarTime, candlesAfter);
+	double macd[][] = indicators.macd(instrument, period, offerSide, IIndicators.AppliedPrice.CLOSE,
+        	macdFastTimePeriod, macdSlowTimePeriod, macdSignalTimePeriod,Filter.NO_FILTER, candlesBefore, currBarTime, candlesAfter);
+	double rsi[] = indicators.rsi(instrument, period, offerSide, IIndicators.AppliedPrice.CLOSE,
+        	rsiTimePeriod, Filter.NO_FILTER, candlesBefore, currBarTime, candlesAfter);
+	int cdlEngulfing[] = indicators.cdlEngulfing(instrument, period, offerSide, Filter.NO_FILTER, candlesBefore, currBarTime, candlesAfter);
+
         try {
             out.write(dateFormat.format(bar.getTime()) + "," + priceFormat.format(bar.getOpen()) + "," + priceFormat.format(bar.getHigh()) + ","
-                    + priceFormat.format(bar.getLow()) + "," + priceFormat.format(bar.getClose()) + "," + priceFormat.format(askBar.getVolume()));
+                    + priceFormat.format(bar.getLow()) + "," + priceFormat.format(bar.getClose()) + "," + priceFormat.format(askBar.getVolume()) + ","
+                    + priceFormat.format(ema[daysBack]) + "," + priceFormat.format(macd[3][daysBack]) + "," + priceFormat.format(rsi[daysBack]) + "," 
+                    + priceFormat.format(cdlEngulfing[daysBack]));
         } catch (Exception e) {
             console.getErr().println(e.getMessage());
             e.printStackTrace(console.getErr());
             context.stop();
         }
 
+
 	for(int i = 1; i = daysBack; i++) {
-	        previousBar[i] = history.getBar(myInstrument, myPeriod, myOfferSide, i+1);
+	        previousBar[i] = history.getBar(myInstrument, myPeriod, myOfferSide, i);
 	        try {
-	            out.write("," + priceFormat.format(previousBar[i].getOpen()) + "," + priceFormat.format(bar.getHigh()) + ","
-	                    + priceFormat.format(bar.getLow()) + "," + priceFormat.format(bar.getClose()) + "," + priceFormat.format(askBar.getVolume()));
+	            out.write("," + priceFormat.format(previousBar[i].getOpen()) + "," + priceFormat.format(previousBar[i].getHigh()) + ","
+	                    + priceFormat.format(previousBar[i].getLow()) + "," + priceFormat.format(previousBar[i].getClose()) + "," 
+	                    + priceFormat.format(previousBar[i].getVolume())+ "," + priceFormat.format(ema[daysBack-1]) + "," 
+	                    + priceFormat.format(macd[3][daysBack-1]) + "," + priceFormat.format(rsi[daysBack-1]) + "," 
+                    	    + priceFormat.format(cdlEngulfing[daysBack-1]));
 	        } catch (Exception e) {
 	            console.getErr().println(e.getMessage());
 	            e.printStackTrace(console.getErr());
 	            context.stop();
 	        }
+	        
 	}
-
-        out.write("\r\n");
+	
+        try {
+	    out.write("\r\n");
+        } catch (Exception e) {
+            console.getErr().println(e.getMessage());
+            e.printStackTrace(console.getErr());
+            context.stop();
+        }
 
    }
 }
