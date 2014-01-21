@@ -43,11 +43,23 @@ public class DataFeederv2 implements IStrategy {
     @Configurable("RSI time period")
     public int rsiTimePeriod = 14;
 
+    @Configurable("CMO time period")
+    public int cmoTimePeriod = ??;
+
     @Configurable("ADX time period")
     public int adxTimePeriod = 14;
 
-    @Configurable("Aroon time period")
-    public int aroonTimePeriod = 14;
+    @Configurable("Aroon Oscilator time period")
+    public int aroonTimePeriod = ??;
+
+    @Configurable("SAR acceleration")
+    public double sarAcceleration = 0.02;
+
+    @Configurable("SAR maximum")
+    public double sarMaximum = 0.2;
+
+    @Configurable("CCI time period")
+    public int cciTimePeriod = 14;
 
     @Configurable("CCI time period")
     public int cciTimePeriod = 14;
@@ -87,7 +99,7 @@ public class DataFeederv2 implements IStrategy {
         
         
         try {
-            out.write("Date,Time,Open, High, Low, Close, Volume, Ema, MACD, RSI, Engulfing");
+            out.write("Date,Time,Open, High, Low, Close, Volume, Ema, MACD, RSI, Engulfing, CMO, ADX, AroonOsc, CCI, SAR");
         } catch (Exception e) {
             console.getErr().println(e.getMessage());
             e.printStackTrace(console.getErr());
@@ -99,7 +111,8 @@ public class DataFeederv2 implements IStrategy {
             IBar previousBar = history.getBar(instrument, period, offerSide, i);
             try {
                 out.write("," + "Open" + i + "," + "High" + i + "," + "Low" + i + "," + "Close" + i + "," + "Volume" + i + "," 
-                        + "Ema" + i + "," +"MACD" + i + "," + "RSI" + i + "," + "Engulfing" + i);
+                        + "Ema" + i + "," +"MACD" + i + "," + "RSI" + i + "," + "Engulfing" + i + "," + "CMO" + i + "," + "ADX" + i + ","
+                        + "AroonOsc" + i + "," + "CCI" + i + "," + "SAR" + i);
             } catch (Exception e) {
                 console.getErr().println(e.getMessage());
                 e.printStackTrace(console.getErr());
@@ -160,23 +173,26 @@ public class DataFeederv2 implements IStrategy {
             macdFastTimePeriod, macdSlowTimePeriod, macdSignalTimePeriod,Filter.NO_FILTER, candlesBefore, currBarTime, candlesAfter);
     double rsi[] = indicators.rsi(instrument, period, offerSide, IIndicators.AppliedPrice.CLOSE,
             rsiTimePeriod, Filter.NO_FILTER, candlesBefore, currBarTime, candlesAfter);
-    double adx = indicators.adx(instrument, period, offerSide, adxTimePeriod, shift);
-    double aroon[] = indicators.aroon(instrument, period, offerSide, aroonTimePeriod, shift);
-    double cci = indicators.cci(instrument, period, offerSide, cciTimePeriod, shift);
-    
-    
     int cdlEngulfing[] = indicators.cdlEngulfing(instrument, period, offerSide, Filter.NO_FILTER, candlesBefore, currBarTime, candlesAfter);
+    double cmo[] = indicators.cmo(instrument, period, offerSide, IIndicators.AppliedPrice.CLOSE, cmoTimePeriod, Filter.NO_FILTER, candlesBefore, currBarTime, candlesAfter);
+    double adx[] = indicators.adx(instrument, period, offerSide, IIndicators.AppliedPrice.CLOSE, adxTimePeriod, Filter.NO_FILTER, candlesBefore, currBarTime, candlesAfter);
+    double aroonOsc[] = indicators.aroonOsc(instrument, period, offerSide, aroonOscTimePeriod, Filter.NO_FILTER, candlesBefore, currBarTime, candlesAfter);
+    double cci[] = indicators.cci(instrument, period, offerSide, aroonOscTimePeriod, Filter.NO_FILTER, candlesBefore, currBarTime, candlesAfter);
+    double sar[] = indicators.sar(instrument, period, offerSide, sarAcceleration, sarMaximum, Filter.NO_FILTER, candlesBefore, currBarTime, candlesAfter);
 
-        try {
-            out.write(dateFormat.format(bar.getTime()) + "," + priceFormat.format(bar.getOpen()) + "," + priceFormat.format(bar.getHigh()) + ","
-                    + priceFormat.format(bar.getLow()) + "," + priceFormat.format(bar.getClose()) + "," + priceFormat.format(askBar.getVolume()) + ","
-                    + priceFormat.format(ema[daysBack]) + "," + priceFormat.format(macd[2][2]) + "," + priceFormat.format(rsi[daysBack]) + "," 
-                    + priceFormat.format(cdlEngulfing[daysBack]));
-        } catch (Exception e) {
-            console.getErr().println(e.getMessage());
-            e.printStackTrace(console.getErr());
-            context.stop();
-        }
+    out.write("Date,Time,Open, High, Low, Close, Volume, Ema, MACD, RSI, Engulfing, CMO, ADX, AROON, CCI, SAR");
+	
+    try {
+	    out.write(dateFormat.format(bar.getTime()) + "," + priceFormat.format(bar.getOpen()) + "," + priceFormat.format(bar.getHigh()) + ","
+	            + priceFormat.format(bar.getLow()) + "," + priceFormat.format(bar.getClose()) + "," + priceFormat.format(askBar.getVolume()) + ","
+	            + priceFormat.format(ema[daysBack]) + "," + priceFormat.format(macd[2][2]) + "," + priceFormat.format(rsi[daysBack]) + "," 
+	            + priceFormat.format(cdlEngulfing[daysBack]) + "," + priceFormat.format(cmo[daysBack]) + "," + priceFormat.format(adx[daysBack]) + ","
+	            + priceFormat.format(aroonOsc[daysBack]) + "," + priceFormat.format(cci[daysBack]) + "," + priceFormat.format(sar[daysBack]));
+	} catch (Exception e) {
+	    console.getErr().println(e.getMessage());
+	    e.printStackTrace(console.getErr());
+	    context.stop();
+	}
 
 
     for (int i = 2; i < daysBack + 1; i++) {
@@ -186,7 +202,8 @@ public class DataFeederv2 implements IStrategy {
                         + priceFormat.format(previousBar.getLow()) + "," + priceFormat.format(previousBar.getClose()) + "," 
                         + priceFormat.format(previousBar.getVolume())+ "," + priceFormat.format(ema[daysBack-i]) + "," 
                         + priceFormat.format(macd[2][daysBack-i]) + "," + priceFormat.format(rsi[daysBack-i]) + "," 
-                            + priceFormat.format(cdlEngulfing[daysBack-i]));
+                        + priceFormat.format(cdlEngulfing[daysBack-i]) "," + priceFormat.format(cmo[daysBack-i]) + "," + priceFormat.format(adx[daysBack-i]) + ","
+	                + priceFormat.format(aroonOsc[daysBack-i]) + "," + priceFormat.format(cci[daysBack-i]) + "," + priceFormat.format(sar[daysBack-i]));
             } catch (Exception e) {
                 console.getErr().println(e.getMessage());
                 e.printStackTrace(console.getErr());
