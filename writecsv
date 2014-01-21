@@ -3,11 +3,12 @@ package jforex;
 import java.util.*;
 import java.io.*;
 import java.text.*;
- 
+import java.math.*;
+import java.lang.Math;
 import com.dukascopy.api.*;
 
 @RequiresFullAccess
-public class ExportToCSV implements IStrategy {
+public class DataFeederv2 implements IStrategy {
    private IEngine engine;
    private IConsole console;
    private IHistory history;
@@ -19,13 +20,13 @@ public class ExportToCSV implements IStrategy {
     public Instrument instrument = Instrument.EURUSD;
  
     @Configurable("Period")
-    public Period period = Period.ONE_MIN;
+    public Period period = Period.ONE_HOUR;
      
     @Configurable("OfferSide")
     public OfferSide offerSide = OfferSide.BID;
 
-    @Configurable("DaysBack")
-    public int daysBack = 4;
+    @Configurable("Days Back")
+    public int daysBack = 5;
  
     @Configurable("EMA time period")
     public int emaTimePeriod = 5;
@@ -41,6 +42,15 @@ public class ExportToCSV implements IStrategy {
 
     @Configurable("RSI time period")
     public int rsiTimePeriod = 14;
+
+    @Configurable("ADX time period")
+    public int adxTimePeriod = 14;
+
+    @Configurable("Aroon time period")
+    public int aroonTimePeriod = 14;
+
+    @Configurable("CCI time period")
+    public int cciTimePeriod = 14;
 
     @Configurable("File")
     public File file;
@@ -74,6 +84,39 @@ public class ExportToCSV implements IStrategy {
             e.printStackTrace(console.getErr());
             context.stop();
         }
+        
+        
+        try {
+            out.write("Date,Time,Open, High, Low, Close, Volume, Ema, MACD, RSI, Engulfing");
+        } catch (Exception e) {
+            console.getErr().println(e.getMessage());
+            e.printStackTrace(console.getErr());
+            context.stop();
+        }
+
+
+    for (int i = 2; i < daysBack + 1; i++) {
+            IBar previousBar = history.getBar(instrument, period, offerSide, i);
+            try {
+                out.write("," + "Open" + i + "," + "High" + i + "," + "Low" + i + "," + "Close" + i + "," + "Volume" + i + "," 
+                        + "Ema" + i + "," +"MACD" + i + "," + "RSI" + i + "," + "Engulfing" + i);
+            } catch (Exception e) {
+                console.getErr().println(e.getMessage());
+                e.printStackTrace(console.getErr());
+                context.stop();
+            }
+            
+    }
+
+    
+    try {
+    out.write(",bssignal\r\n");
+    } catch (Exception e) {
+        console.getErr().println(e.getMessage());
+        e.printStackTrace(console.getErr());
+        context.stop();
+    }
+    
     }
  
    public void onAccount(IAccount account) throws JFException {
@@ -101,23 +144,33 @@ public class ExportToCSV implements IStrategy {
         if (instrument != this.instrument || period != this.period) {
             return;
         }
-        private IBar previousBar[];
-	int candlesBefore = daysBack, candlesAfter = 0;
-        IBar bar = offerSide == OfferSide.ASK ? askBar : bidBar;
-        previousBar[0] = bar;
-    	long currBarTime = barar.getTime();
-	double ema[] = indicators.ema(instrument, period, offerSide, IIndicators.AppliedPrice.CLOSE,
-        	emaTimePeriod, Filter.NO_FILTER, candlesBefore, currBarTime, candlesAfter);
-	double macd[][] = indicators.macd(instrument, period, offerSide, IIndicators.AppliedPrice.CLOSE,
-        	macdFastTimePeriod, macdSlowTimePeriod, macdSignalTimePeriod,Filter.NO_FILTER, candlesBefore, currBarTime, candlesAfter);
-	double rsi[] = indicators.rsi(instrument, period, offerSide, IIndicators.AppliedPrice.CLOSE,
-        	rsiTimePeriod, Filter.NO_FILTER, candlesBefore, currBarTime, candlesAfter);
-	int cdlEngulfing[] = indicators.cdlEngulfing(instrument, period, offerSide, Filter.NO_FILTER, candlesBefore, currBarTime, candlesAfter);
+        
+    String bssignal = new String();
+    int candlesBefore = daysBack+1, candlesAfter = 0;
+    IBar bar = offerSide == OfferSide.ASK ? askBar : bidBar;
+    long currBarTime = bar.getTime();
+    int shift = 1;
+    IBar LastDay = history.getBar(instrument, period, offerSide, shift);
+    if (LastDay.getVolume() == 0) {
+        return;
+    }
+    double ema[] = indicators.ema(instrument, period, offerSide, IIndicators.AppliedPrice.CLOSE,
+            emaTimePeriod, Filter.NO_FILTER, candlesBefore, currBarTime, candlesAfter);
+    double macd[][] = indicators.macd(instrument, period, offerSide, IIndicators.AppliedPrice.CLOSE,
+            macdFastTimePeriod, macdSlowTimePeriod, macdSignalTimePeriod,Filter.NO_FILTER, candlesBefore, currBarTime, candlesAfter);
+    double rsi[] = indicators.rsi(instrument, period, offerSide, IIndicators.AppliedPrice.CLOSE,
+            rsiTimePeriod, Filter.NO_FILTER, candlesBefore, currBarTime, candlesAfter);
+    double adx = indicators.adx(instrument, period, offerSide, adxTimePeriod, shift);
+    double aroon[] = indicators.aroon(instrument, period, offerSide, aroonTimePeriod, shift);
+    double cci = indicators.cci(instrument, period, offerSide, cciTimePeriod, shift);
+    
+    
+    int cdlEngulfing[] = indicators.cdlEngulfing(instrument, period, offerSide, Filter.NO_FILTER, candlesBefore, currBarTime, candlesAfter);
 
         try {
             out.write(dateFormat.format(bar.getTime()) + "," + priceFormat.format(bar.getOpen()) + "," + priceFormat.format(bar.getHigh()) + ","
                     + priceFormat.format(bar.getLow()) + "," + priceFormat.format(bar.getClose()) + "," + priceFormat.format(askBar.getVolume()) + ","
-                    + priceFormat.format(ema[daysBack]) + "," + priceFormat.format(macd[3][daysBack]) + "," + priceFormat.format(rsi[daysBack]) + "," 
+                    + priceFormat.format(ema[daysBack]) + "," + priceFormat.format(macd[2][2]) + "," + priceFormat.format(rsi[daysBack]) + "," 
                     + priceFormat.format(cdlEngulfing[daysBack]));
         } catch (Exception e) {
             console.getErr().println(e.getMessage());
@@ -126,24 +179,38 @@ public class ExportToCSV implements IStrategy {
         }
 
 
-	for(int i = 1; i = daysBack; i++) {
-	        previousBar[i] = history.getBar(myInstrument, myPeriod, myOfferSide, i);
-	        try {
-	            out.write("," + priceFormat.format(previousBar[i].getOpen()) + "," + priceFormat.format(previousBar[i].getHigh()) + ","
-	                    + priceFormat.format(previousBar[i].getLow()) + "," + priceFormat.format(previousBar[i].getClose()) + "," 
-	                    + priceFormat.format(previousBar[i].getVolume())+ "," + priceFormat.format(ema[daysBack-1]) + "," 
-	                    + priceFormat.format(macd[3][daysBack-1]) + "," + priceFormat.format(rsi[daysBack-1]) + "," 
-                    	    + priceFormat.format(cdlEngulfing[daysBack-1]));
-	        } catch (Exception e) {
-	            console.getErr().println(e.getMessage());
-	            e.printStackTrace(console.getErr());
-	            context.stop();
-	        }
-	        
-	}
-	
+    for (int i = 2; i < daysBack + 1; i++) {
+            IBar previousBar = history.getBar(instrument, period, offerSide, i);
+            try {
+                out.write("," + priceFormat.format(previousBar.getOpen()) + "," + priceFormat.format(previousBar.getHigh()) + ","
+                        + priceFormat.format(previousBar.getLow()) + "," + priceFormat.format(previousBar.getClose()) + "," 
+                        + priceFormat.format(previousBar.getVolume())+ "," + priceFormat.format(ema[daysBack-i]) + "," 
+                        + priceFormat.format(macd[2][daysBack-i]) + "," + priceFormat.format(rsi[daysBack-i]) + "," 
+                            + priceFormat.format(cdlEngulfing[daysBack-i]));
+            } catch (Exception e) {
+                console.getErr().println(e.getMessage());
+                e.printStackTrace(console.getErr());
+                context.stop();
+            }
+            
+    }
+        IBar previousBar = history.getBar(instrument, period, offerSide, 1);
+        BigDecimal currentClose = new BigDecimal(previousBar.getClose(), MathContext.DECIMAL64);
+        IBar lastBar = history.getBar(instrument, period, offerSide, 2);
+        BigDecimal previousClose = new BigDecimal(lastBar.getClose(), MathContext.DECIMAL64);
+        if (currentClose.compareTo(previousClose) == 1) {bssignal = "B";} else {bssignal = "S";};
+/*
+        IBar previousBar = history.getBar(instrument, period, offerSide, 1);
+        IBar lastBar = history.getBar(instrument, period, offerSide, 2);
+        double return1 = 100 *(previousBar.getClose() - lastBar.getClose())/ previousBar.getClose();
+        if (return1 < 0.2 && return1 > -0.2) {bssignal = "H";}
+        if (return1 <= -0.2) {bssignal = "S";}
+        if (return1 >= 0.2) {bssignal = "B";}
+*/
+//        printMe(String.format("Current Close = %.5f; Previous Close = %.5f, ; return1 = %.5f", previousBar.getClose(), lastBar.getClose(), return1));
+        
         try {
-	    out.write("\r\n");
+        out.write("," + String.format(bssignal) + "\r\n");
         } catch (Exception e) {
             console.getErr().println(e.getMessage());
             e.printStackTrace(console.getErr());
@@ -151,4 +218,11 @@ public class ExportToCSV implements IStrategy {
         }
 
    }
+    private void printMe(Object toPrint) {
+        console.getOut().println(toPrint);
+    }
+
+    private void printMeError(Object o) {
+        console.getErr().println(o);
+    }
 }
