@@ -29,16 +29,20 @@ public class RSISARv3 implements IStrategy {
     public OfferSide myOfferSide;
     @Configurable(value = "Period value")
     public Period myPeriod = Period.FIVE_MINS;
-    @Configurable("SAR acceleration")
-    public double sarAcceleration = 0.02;
+    @Configurable("periods back")
+    public int periodsBack = 48;
     @Configurable("SAR maximum")
     public double sarMaximum = 0.2;
     @Configurable("RSI time period")
     public int timePeriod = 14;
-    @Configurable("RSI Max Limit")
-    public double RSIMaximum = 70;
-    @Configurable("RSI Min Limit")
-    public double RSIMinimum = 30;
+    @Configurable("RSI Up Low")
+    public int RSIUpLow = 50;
+    @Configurable("RSI UP High")
+    public int RSIUpHigh = 75;
+    @Configurable("RSI Down Low")
+    public int RSIDownLow = 25;
+    @Configurable("RSI Down High")
+    public int RSIDownHigh = 50;
     @Configurable("Stop loss in pips")
     public int stopLossPips = 10;
     @Configurable("Take profit in pips")
@@ -53,7 +57,7 @@ public class RSISARv3 implements IStrategy {
         this.history = context.getHistory();
         this.context = context;
         this.indicators = context.getIndicators();
-    this.userInterface = context.getUserInterface();
+    	this.userInterface = context.getUserInterface();
 
         Set<Instrument> instruments = new HashSet<Instrument>();
         instruments.add(myInstrument);
@@ -69,10 +73,10 @@ public class RSISARv3 implements IStrategy {
         }
     }
 
-  public void onStop() throws JFException {}
+    public void onStop() throws JFException {}
 
 
-  public void onTick(Instrument instrument, ITick tick) throws JFException {
+    public void onTick(Instrument instrument, ITick tick) throws JFException {
   }//end of onTick method
 
     
@@ -88,58 +92,36 @@ public class RSISARv3 implements IStrategy {
 
     int shift = 1;
     IBar currentBar = history.getBar(instrument, period, myOfferSide, shift);
+    IBar periodsBackBar = history.getBar(instrument, period, myOfferSide, periodsBack);
     long currentBarTimeL = currentBar.getTime();
-    IBar previousBar = history.getBar(instrument, period, myOfferSide, 2);
 
-    int candlesBefore = 4, candlesAfter = 0;
-//    long completedBarTimeL = myOfferSide == OfferSide.ASK ? askBar.getTime() : bidBar.getTime();
-//    double sar[] = indicators.sar(instrument, period, myOfferSide, sarAcceleration, sarMaximum, Filter.NO_FILTER, candlesBefore, currentBarTimeL, candlesAfter);
     double rsi[] = indicators.rsi(instrument, period, myOfferSide, IIndicators.AppliedPrice.CLOSE,
-            timePeriod, Filter.NO_FILTER, candlesBefore, currentBarTimeL, candlesAfter);
+            timePeriod, shift);
 
     IEngine.OrderCommand myCommand = null;
-      
-     double sarc = indicators.sar(instrument, period, myOfferSide, sarAcceleration, sarMaximum, 2);
-     double sarp = indicators.sar(instrument, period, myOfferSide, sarAcceleration, sarMaximum, 3);
-        console.getOut().format(DateUtils.format(currentBarTimeL)).println();        
-        printMe(String.format("SAR current = %.5f; Current Close = %.5f", sarc, currentBar.getClose()));
-        printMe(String.format("SAR Previous = %.5f; Previous Close = %.5f", sarp, previousBar.getClose()));
-//     if ((sar[3] >= currentBar.getClose() && sar[2] <= previousBar.getClose()) || (sar[3] <= currentBar.getClose() && sar[2] >= previousBar.getClose())){
-     if ((sarc >= currentBar.getClose() && sarp <= previousBar.getClose()) || (sarc <= currentBar.getClose() && sarp >= previousBar.getClose())){
-        closeCounter++;
-        printMe(closeCounter);
-    }
-
-          
     previousOrder = engine.getOrder("MyStrategyOrder");            
-              
-//    if ((rsi[1] <= RSIMinimum || rsi[2] <= RSIMinimum || rsi[3] <= RSIMinimum) && currentBar.getOpen() < currentBar.getClose() && (previousOrder == null || (previousOrder != null && previousOrder.getOrderCommand() == IEngine.OrderCommand.SELL))) {
-//    if ((rsi[3] <= RSIMinimum) && currentBar.getOpen() < currentBar.getClose() && (previousOrder == null || (previousOrder != null && previousOrder.getOrderCommand() == IEngine.OrderCommand.SELL))) {
-    if ((rsi[3] <= RSIMinimum) && currentBar.getOpen() < currentBar.getClose() && previousBar.getOpen() < previousBar.getClose() && (previousOrder == null || (previousOrder != null && previousOrder.getOrderCommand() == IEngine.OrderCommand.SELL))) {
+
+//  Sharp down move
+    if (rsi[shift] > RSIDownHigh  && previousOrder != null && periodsBackBar.getClose()-currentBar.getClose()> 0.003) {
         console.getOut().format(DateUtils.format(currentBarTimeL)).println();        
-        printMe("RSI Down"); 
-        printMe(String.format("Current Open = %.5f; Current Close = %.5f", currentBar.getOpen(), currentBar.getClose()));
-        printMe(String.format("RSI = %.5f", rsi[shift]));
-        myCommand = IEngine.OrderCommand.BUY;
-        buyFlag = true;
-        if (sarc >= currentBar.getClose()){
-            closeCounter = 1;
-        } else {
-            closeCounter = 2;
-        }
-    } else if ((rsi[3] >= RSIMaximum) && currentBar.getOpen() >= currentBar.getClose() && previousBar.getOpen() >= previousBar.getClose() && (previousOrder == null || (previousOrder != null && previousOrder.getOrderCommand() == IEngine.OrderCommand.BUY))) {
-        console.getOut().format(DateUtils.format(currentBarTimeL)).println();        
-        printMe("RSI Up"); 
-        printMe(String.format("Current Open = %.5f; Current Close = %.5f", currentBar.getOpen(), currentBar.getClose()));
-        printMe(String.format("RSI = %.5f", rsi[3]));
+        printMe("Sharp Down"); 
+        printMe("RSI High"); 
         myCommand = IEngine.OrderCommand.SELL;
-        sellFlag = true;
-        if (sarc >= currentBar.getClose()){
-            closeCounter = 2;
-        } else {
-            closeCounter = 1;
-        }
-    } else if (closeCounter == 3){
+    } else if (rsi[shift] < RSIDownLow  && previousOrder != null && periodsBackBar.getClose()-currentBar.getClose()> 0.003) {
+        console.getOut().format(DateUtils.format(currentBarTimeL)).println();        
+        printMe("Sharp Down"); 
+        printMe("RSI Low"); 
+        myCommand = IEngine.OrderCommand.BUY;
+    } else if (rsi[shift] < RSIUPLow  && previousOrder != null && currentBar.getClose()-periodsBackBar.getClose()> 0.003){
+        console.getOut().format(DateUtils.format(currentBarTimeL)).println();        
+        printMe("Sharp Up"); 
+        printMe("RSI Low"); 
+        myCommand = IEngine.OrderCommand.SELL;
+    } else if (rsi[shift] > RSIUPHigh  && previousOrder != null && currentBar.getClose()-periodsBackBar.getClose()> 0.003){
+        console.getOut().format(DateUtils.format(currentBarTimeL)).println();        
+        printMe("Sharp Up"); 
+        printMe("RSI High"); 
+        myCommand = IEngine.OrderCommand.SELL;
     } else {
         return;
     }
@@ -153,8 +135,6 @@ public class RSISARv3 implements IStrategy {
         console.getOut().println("Order " + order.getLabel() + " is closed");
         previousSignal = "N";
         currentSignal = "N";    
-//        buyFlag = false;
-//        sellFlag = false;
     } else if (order == null) {
         console.getOut().println("No order to close");
     }              
@@ -165,10 +145,7 @@ public class RSISARv3 implements IStrategy {
     double stopLossValueForShort = myInstrument.getPipValue() * takeProfitPips;
 
     if(myCommand != null){
-//        console.getOut().format(DateUtils.format(currentBarTimeL)).println();        
-//        printMe(String.format("Bar MACD Values Current : MACD = %.5f; MACD Signal = %.5f, ; MACD Hist = %.5f", macd[0][3], macd[1][3], macd[2][3]));
-//        printMe(String.format("RSI = %.5f", rsi[shift]));
-    
+  
         double stopLossPrice = myCommand.isLong() ? (lastTickBid - stopLossValueForLong) : (lastTickAsk + stopLossValueForLong);
         double takeProfitPrice = myCommand.isLong() ? (lastTickBid + stopLossValueForShort) : (lastTickAsk - stopLossValueForShort);
         previousBar = myOfferSide == OfferSide.ASK ? askBar : bidBar;
