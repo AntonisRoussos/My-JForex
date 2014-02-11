@@ -1,4 +1,4 @@
-  package macd;
+package macd;
 
 import com.dukascopy.api.*;
 import java.util.HashSet;
@@ -86,6 +86,7 @@ public class MACDRSIv6 implements IStrategy {
     double stopLossValue = 0;
     double stopLossPrice = 0;
     double takeProfitPrice = 0;
+    double takeProfitthreshold = 0;
     double stopLossValueForLong =0;
 
     previousOrder = engine.getOrder("MyStrategyOrder");     
@@ -93,12 +94,16 @@ public class MACDRSIv6 implements IStrategy {
 	lastTickBid = history.getLastTick(myInstrument).getBid();
 	lastTickAsk = history.getLastTick(myInstrument).getAsk();
 
+    if (previousOrder != null) {
+        takeProfitthreshold = previousOrder.isLong() ? (takeProfitPrice - percentageIncreament * increamentTPSLPips) : (takeProfitPrice + percentageIncreament * increamentTPSLPips);
+	}
+
     if (previousOrder != null
-        && ((lastTickAsk >= takeProfitPrice * percentageIncreament && previousOrder.getOrderCommand() == IEngine.OrderCommand.SELL)
-        || (lastTickBid <= takeProfitPrice * percentageIncreament && previousOrder.getOrderCommand() == IEngine.OrderCommand.BUY))) {
+        && ((lastTickAsk >= takeProfitthreshold && previousOrder.getOrderCommand() == IEngine.OrderCommand.SELL)
+        || (lastTickBid <= takeProfitthreshold && previousOrder.getOrderCommand() == IEngine.OrderCommand.BUY))) {
         stopLossValue = myInstrument.getPipValue() * increamentTPSLPips * n;
         stopLossPrice = previousOrder.isLong() ? (stopLossPrice - stopLossValue) : (stopLossPrice + stopLossValue);
-        takeProfitPrice = previousOrder.isLong() ? (stopLossPrice + stopLossValue) : (stopLossPrice - stopLossValue);
+        takeProfitPrice = previousOrder.isLong() ? (takeProfitPrice + stopLossValue) : (takeProfitPrice - stopLossValue);
         previousOrder.setStopLossPrice(stopLossPrice);
         previousOrder.setTakeProfitPrice(takeProfitPrice);
 	long lastTickTime = history.getLastTick(myInstrument).getTime();
